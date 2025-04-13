@@ -40,6 +40,14 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
 
+  YoutubeApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: YoutubeSearchHttpApi
+      CorsConfiguration:
+        AllowMethods: ["GET"]
+        AllowOrigins: ["*"]
+        
   YoutubeSearchFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -55,39 +63,55 @@ Resources:
       Environment:
         Variables:
           YOUTUBE_API_SECRET_NAME: youtube/api/key
+      Events:
+        SearchAPI:
+          Type: HttpApi
+          Properties:
+            Path: /search
+            Method: GET
+            ApiId: !Ref YoutubeApi
+            ApiKeyRequired: true
 
-  ApiGateway:
-    Type: AWS::ApiGateway::RestApi
+  YoutubeApiKey:
+    Type: AWS::ApiGatewayV2::ApiKey
     Properties:
-      Name: YoutubeSearchAPI
+      Name: YoutubeHttpApiKey
 
-  ApiResource:
-    Type: AWS::ApiGateway::Resource
+  YoutubeUsagePlan:
+    Type: AWS::ApiGatewayV2::UsagePlan
     Properties:
-      ParentId: !GetAtt ApiGateway.RootResourceId
-      PathPart: search
-      RestApiId: !Ref ApiGateway
+      UsagePlanName: YoutubeSearchHttpPlan
+      ApiStages:
+        - ApiId: !Ref YoutubeApi
+          Stage: $default
+      Throttle:
+        RateLimit: 10
+        BurstLimit: 5
+      Quota:
+        Limit: 1000
+        Period: MONTH
 
-  ApiMethod:
-    Type: AWS::ApiGateway::Method
+  UsagePlanKey:
+    Type: AWS::ApiGatewayV2::UsagePlanKey
     Properties:
-      AuthorizationType: NONE
-      HttpMethod: GET
-      ResourceId: !Ref ApiResource
-      RestApiId: !Ref ApiGateway
-      Integration:
-        IntegrationHttpMethod: POST
-        Type: AWS_PROXY
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${YoutubeSearchFunction.Arn}/invocations
+      KeyId: !Ref YoutubeApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref YoutubeUsagePlan
 
-  LambdaApiPermission:
-    Type: AWS::Lambda::Permission
+  DeploymentNotificationTopic:
+    Type: AWS::SNS::Topic
     Properties:
-      FunctionName: !Ref YoutubeSearchFunction
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/search
+      TopicName: DeployNotificationTopic
+      Subscription:
+        - Protocol: email
+          Endpoint: joseph.siyi@gmail.com
 
 Outputs:
   ApiEndpoint:
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/search
+    Description: "HTTP API Gateway endpoint URL"
+    Value: !Sub "https://${YoutubeApi}.execute-api.${AWS::Region}.amazonaws.com/search"
+
+  ApiKey:
+    Description: "API Key to access this endpoint"
+    Value: !Ref YoutubeApiKey
+
