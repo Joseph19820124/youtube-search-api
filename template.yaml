@@ -58,6 +58,8 @@ Resources:
           Properties:
             Path: /hello
             Method: GET
+            ApiId: !Ref MyHttpApi
+
 
   # HTTP API定义 (更轻量级，与REST API相比)
   MyHttpApi:
