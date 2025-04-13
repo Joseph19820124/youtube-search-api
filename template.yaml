@@ -1,6 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: YouTube search API with Lambda, REST API Gateway, Secrets Manager, and API Key protection
+Description: YouTube search API using Lambda, HTTP API Gateway, Secrets Manager, and SNS notification
+
+Globals:
+  Api:
+    EndpointConfiguration: REGIONAL
 
 Resources:
   YoutubeLambdaRole:
@@ -30,12 +34,13 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
 
-  YoutubeApi:
-    Type: AWS::Serverless::Api
+  YoutubeHttpApi:
+    Type: AWS::Serverless::HttpApi
     Properties:
-      Name: YoutubeSearchRestApi
-      StageName: Prod
-      EndpointConfiguration: REGIONAL
+      Name: YoutubeSearchHttpApi
+      CorsConfiguration:
+        AllowMethods: ["GET"]
+        AllowOrigins: ["*"]
 
   YoutubeSearchFunction:
     Type: AWS::Serverless::Function
@@ -52,42 +57,11 @@ Resources:
           YOUTUBE_API_SECRET_NAME: youtube/api/key
       Events:
         SearchAPI:
-          Type: Api
+          Type: HttpApi
           Properties:
             Path: /search
             Method: GET
-            RestApiId: !Ref YoutubeApi
-            ApiKeyRequired: true
-
-  YoutubeApiKey:
-    Type: AWS::ApiGateway::ApiKey
-    Properties:
-      Name: YoutubeApiKey
-      Enabled: true
-      StageKeys:
-        - RestApiId: !Ref YoutubeApi
-          StageName: Prod
-
-  YoutubeUsagePlan:
-    Type: AWS::ApiGateway::UsagePlan
-    Properties:
-      UsagePlanName: YoutubeSearchUsagePlan
-      ApiStages:
-        - ApiId: !Ref YoutubeApi
-          Stage: Prod
-      Throttle:
-        RateLimit: 10
-        BurstLimit: 5
-      Quota:
-        Limit: 1000
-        Period: MONTH
-
-  UsagePlanKey:
-    Type: AWS::ApiGateway::UsagePlanKey
-    Properties:
-      KeyId: !Ref YoutubeApiKey
-      KeyType: API_KEY
-      UsagePlanId: !Ref YoutubeUsagePlan
+            ApiId: !Ref YoutubeHttpApi
 
   DeploymentNotificationTopic:
     Type: AWS::SNS::Topic
@@ -99,9 +73,5 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Description: "REST API Gateway endpoint URL"
-    Value: !Sub "https://${YoutubeApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/search"
-
-  ApiKey:
-    Description: "API Key to access this endpoint"
-    Value: !Ref YoutubeApiKey
+    Description: "HTTP API Gateway endpoint URL"
+    Value: !Sub "https://${YoutubeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/search"
