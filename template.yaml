@@ -38,7 +38,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
+                Resource: arn:aws:secretsmanager:*:*:secret:*
 
   YoutubeApi:
     Type: AWS::Serverless::HttpApi
