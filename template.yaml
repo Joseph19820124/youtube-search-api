@@ -41,12 +41,11 @@ Resources:
                 Resource: arn:aws:secretsmanager:*:*:secret:*
 
   YoutubeApi:
-    Type: AWS::Serverless::HttpApi
+    Type: AWS::Serverless::Api
     Properties:
-      Name: YoutubeSearchHttpApi
-      CorsConfiguration:
-        AllowMethods: ["GET"]
-        AllowOrigins: ["*"]
+      Name: YoutubeSearchRestApi
+      StageName: Prod
+      EndpointConfiguration: REGIONAL
         
   YoutubeSearchFunction:
     Type: AWS::Lambda::Function
@@ -65,25 +64,30 @@ Resources:
           YOUTUBE_API_SECRET_NAME: youtube/api/key
       Events:
         SearchAPI:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /search
             Method: GET
             ApiId: !Ref YoutubeApi
             ApiKeyRequired: true
 
+  
   YoutubeApiKey:
-    Type: AWS::ApiGatewayV2::ApiKey
+    Type: AWS::ApiGateway::ApiKey
     Properties:
-      Name: YoutubeHttpApiKey
+      Name: YoutubeApiKey
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref YoutubeApi
+          StageName: Prod
 
   YoutubeUsagePlan:
-    Type: AWS::ApiGatewayV2::UsagePlan
+    Type: AWS::ApiGateway::UsagePlan
     Properties:
-      UsagePlanName: YoutubeSearchHttpPlan
+      UsagePlanName: YoutubeSearchUsagePlan
       ApiStages:
         - ApiId: !Ref YoutubeApi
-          Stage: $default
+          Stage: Prod
       Throttle:
         RateLimit: 10
         BurstLimit: 5
@@ -92,7 +96,7 @@ Resources:
         Period: MONTH
 
   UsagePlanKey:
-    Type: AWS::ApiGatewayV2::UsagePlanKey
+    Type: AWS::ApiGateway::UsagePlanKey
     Properties:
       KeyId: !Ref YoutubeApiKey
       KeyType: API_KEY
@@ -108,10 +112,10 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Description: "HTTP API Gateway endpoint URL"
-    Value: !Sub "https://${YoutubeApi}.execute-api.${AWS::Region}.amazonaws.com/search"
-
+    Description: "REST API Gateway endpoint URL"
+    Value: !Sub "https://${YoutubeApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/search"
   ApiKey:
     Description: "API Key to access this endpoint"
     Value: !Ref YoutubeApiKey
+
 
