@@ -36,7 +36,7 @@ Resources:
       FunctionName: youtubeSearchLambda
       Handler: handler.lambda_handler
       Runtime: python3.11
-      CodeUri: lambda/
+      CodeUri: lambda.zip
       MemorySize: 256
       Timeout: 30
       Role: !GetAtt YoutubeLambdaRole.Arn
