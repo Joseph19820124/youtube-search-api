@@ -1,16 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: YouTube search API with Lambda, API Gateway, and Secrets Manager
-
-Parameters:
-  LambdaS3Bucket:
-    Type: String
-    Default: youtube-api-artifacts-joseph
-    Description: The name of the S3 bucket containing the Lambda zip
-
-  LambdaS3Key:
-    Type: String
-    Default: lambda.zip
-    Description: The S3 object key (path to the lambda.zip)
+Transform: AWS::Serverless-2016-10-31
+Description: YouTube search API with Lambda, REST API Gateway, Secrets Manager, and API Key protection
 
 Resources:
   YoutubeLambdaRole:
@@ -38,7 +28,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: arn:aws:secretsmanager:*:*:secret:*
+                Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
 
   YoutubeApi:
     Type: AWS::Serverless::Api
@@ -46,19 +36,17 @@ Resources:
       Name: YoutubeSearchRestApi
       StageName: Prod
       EndpointConfiguration: REGIONAL
-        
+
   YoutubeSearchFunction:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: youtubeSearchLambda
-      Runtime: python3.11
       Handler: handler.lambda_handler
-      Timeout: 30
+      Runtime: python3.11
+      CodeUri: lambda.zip
       MemorySize: 256
+      Timeout: 30
       Role: !GetAtt YoutubeLambdaRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaS3Bucket
-        S3Key: !Ref LambdaS3Key
       Environment:
         Variables:
           YOUTUBE_API_SECRET_NAME: youtube/api/key
@@ -68,10 +56,9 @@ Resources:
           Properties:
             Path: /search
             Method: GET
-            ApiId: !Ref YoutubeApi
+            RestApiId: !Ref YoutubeApi
             ApiKeyRequired: true
 
-  
   YoutubeApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
@@ -114,8 +101,7 @@ Outputs:
   ApiEndpoint:
     Description: "REST API Gateway endpoint URL"
     Value: !Sub "https://${YoutubeApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/search"
+
   ApiKey:
     Description: "API Key to access this endpoint"
     Value: !Ref YoutubeApiKey
-
-
