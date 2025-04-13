@@ -1,3 +1,4 @@
+# src/app.py
 import os
 import json
 import logging
@@ -96,3 +97,4 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "YouTube search failed"})
         }
+

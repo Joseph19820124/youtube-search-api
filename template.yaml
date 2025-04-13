@@ -1,10 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: YouTube search API using Lambda, HTTP API Gateway, Secrets Manager, and SNS notification
+Description: Lambda function with HTTP API Gateway (no API key protection)
 
-Globals:
-  Api:
-    EndpointConfiguration: REGIONAL
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    Description: API Gateway stage name
 
 Resources:
   YoutubeLambdaRole:
@@ -34,44 +36,49 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
 
-  YoutubeHttpApi:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      Name: YoutubeSearchHttpApi
-      CorsConfiguration:
-        AllowMethods: ["GET"]
-        AllowOrigins: ["*"]
-
-  YoutubeSearchFunction:
+  # Lambda函数定义
+  MyFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: youtubeSearchLambda
-      Handler: handler.lambda_handler
+      CodeUri: ./lambda/
+      Handler: app.lambda_handler
       Runtime: python3.11
-      CodeUri: lambda.zip
-      MemorySize: 256
+      Architectures:
+        - x86_64
+      MemorySize: 128
       Timeout: 30
       Role: !GetAtt YoutubeLambdaRole.Arn
       Environment:
         Variables:
+          LOG_LEVEL: INFO
           YOUTUBE_API_SECRET_NAME: youtube/api/key
       Events:
-        SearchAPI:
+        ApiEvent:
           Type: HttpApi
           Properties:
-            Path: /search
+            Path: /hello
             Method: GET
-            ApiId: !Ref YoutubeHttpApi
 
-  DeploymentNotificationTopic:
-    Type: AWS::SNS::Topic
+  # HTTP API定义 (更轻量级，与REST API相比)
+  MyHttpApi:
+    Type: AWS::Serverless::HttpApi
     Properties:
-      TopicName: DeployNotificationTopic
-      Subscription:
-        - Protocol: email
-          Endpoint: joseph.siyi@gmail.com
+      StageName: !Ref StageName
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+        AllowOrigins:
+          - '*'
 
 Outputs:
   ApiEndpoint:
     Description: "HTTP API Gateway endpoint URL"
-    Value: !Sub "https://${YoutubeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/search"
+    Value: !Sub "https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/hello"
+  
+  FunctionName:
+    Description: "Lambda Function Name"
+    Value: !Ref MyFunction
