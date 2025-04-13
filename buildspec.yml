@@ -11,3 +11,4 @@ phases:
 artifacts:
   files:
     - lambda.zip
+    - template.yaml
