@@ -40,7 +40,7 @@ Resources:
   MyFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./lambda/
+      CodeUri: s3://youtube-api-artifacts-joseph/lambda.zip
       Handler: app.lambda_handler
       Runtime: python3.11
       Architectures:
