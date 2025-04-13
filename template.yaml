@@ -1,6 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: YouTube search API with Lambda, API Gateway, and email notification
+Description: YouTube search API with Lambda, API Gateway, and Secrets Manager
+
+Parameters:
+  LambdaS3Bucket:
+    Type: String
+    Default: youtube-api-artifacts-joseph
+    Description: The name of the S3 bucket containing the Lambda zip
+
+  LambdaS3Key:
+    Type: String
+    Default: lambda.zip
+    Description: The S3 object key (path to the lambda.zip)
 
 Resources:
   YoutubeLambdaRole:
@@ -31,34 +41,53 @@ Resources:
                 Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
 
   YoutubeSearchFunction:
-    Type: AWS::Serverless::Function
+    Type: AWS::Lambda::Function
     Properties:
       FunctionName: youtubeSearchLambda
-      Handler: handler.lambda_handler
       Runtime: python3.11
-      CodeUri: lambda.zip
-      MemorySize: 256
+      Handler: handler.lambda_handler
       Timeout: 30
+      MemorySize: 256
       Role: !GetAtt YoutubeLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3Key
       Environment:
         Variables:
           YOUTUBE_API_SECRET_NAME: youtube/api/key
-      Events:
-        SearchAPI:
-          Type: Api
-          Properties:
-            Path: /search
-            Method: GET
 
-  DeploymentNotificationTopic:
-    Type: AWS::SNS::Topic
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
     Properties:
-      TopicName: DeployNotificationTopic
-      Subscription:
-        - Protocol: email
-          Endpoint: joseph.siyi@gmail.com
+      Name: YoutubeSearchAPI
+
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: search
+      RestApiId: !Ref ApiGateway
+
+  ApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId: !Ref ApiResource
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${YoutubeSearchFunction.Arn}/invocations
+
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref YoutubeSearchFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/search
 
 Outputs:
   ApiEndpoint:
-    Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/search"
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/search
