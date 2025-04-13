@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: YouTube search API with Lambda, API Gateway, and email notification
+
+Resources:
+  YoutubeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: youtube-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionWithSecrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: arn:aws:secretsmanager:*:*:secret:youtube/*
+
+  YoutubeSearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: youtubeSearchLambda
+      Handler: handler.lambda_handler
+      Runtime: python3.11
+      CodeUri: lambda/
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt YoutubeLambdaRole.Arn
+      Environment:
+        Variables:
+          YOUTUBE_API_SECRET_NAME: youtube/api/key
+      Events:
+        SearchAPI:
+          Type: Api
+          Properties:
+            Path: /search
+            Method: GET
+
+  DeploymentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: DeployNotificationTopic
+      Subscription:
+        - Protocol: email
+          Endpoint: joseph.siyi@gmail.com
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/search"
